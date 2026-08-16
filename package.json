@@ -1,0 +1,9 @@
+{
+  "name": "hactt-unit-board",
+  "private": true,
+  "type": "module",
+  "description": "HIE Acute Care Task Tool — shared unit board for ICN beds 1-20",
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
+}
