@@ -1,11 +1,11 @@
-# HACTT — HIE Acute Care Task Tool (shared unit board)
+# HACTT — HIE Acute Care Task Tool
 
-A shared, live-syncing checklist for therapeutic hypothermia in neonatal HIE. Patients are
-anchored to a bed (ICN 1–20). Any device on the site sees the same board; start times, timers,
-checklist items, blood gases and notes sync across devices within about five seconds.
+A shared, live-syncing checklist for therapeutic hypothermia in neonatal HIE. The app holds one
+active baby at a time. Any device that opens the site sees the same record; birth time, timers,
+checklist items, Apgars, blood gases and Sarnat exams sync across devices within about five
+seconds.
 
-**No patient identifiers are stored.** A record is a bed number and clinical data only. Staff
-match bed to baby at the cotside.
+**No patient identifiers are stored.** A record is clinical data only.
 
 This is a decision-support prototype, not a substitute for clinical judgment.
 
@@ -19,7 +19,7 @@ This is a decision-support prototype, not a substitute for clinical judgment.
 cd site
 git init
 git add .
-git commit -m "HACTT unit board"
+git commit -m "HACTT"
 git branch -M main
 git remote add origin https://github.com/YOUR-USERNAME/hactt.git
 git push -u origin main
@@ -34,23 +34,29 @@ git push -u origin main
    - Functions directory: `netlify/functions`
 3. **Deploy**.
 
-Netlify Blobs is enabled automatically on deployed sites — there are no API keys, environment
-variables, or database setup steps. Storage lives with the site.
-
-### 3. Open it on the unit
-
-Any device that opens the site URL joins the same board. No login.
+Netlify Blobs is enabled automatically on deployed sites. There are no API keys, environment
+variables, or database setup steps.
 
 ---
+
+## Flow
+
+1. **Admit baby** — the start screen is one large button. Set time of birth (defaults to now)
+   and birth weight, then tap the button.
+2. **Checklist** — the header shows birth time, weight, Apgars (once you tap **Done** on the
+   Apgar table), UVC / UAC / ETT depths, age, and the cooling-window countdown. Entering a cord
+   gas ticks "Obtain cord gases"; entering a weight ticks "Enter birth weight".
+3. **Reset data** — after confirming, wipes the record on every device and returns to the
+   Admit screen.
 
 ## How sync works
 
 | | |
 |---|---|
-| Storage | Netlify Blobs, one JSON blob per bed plus one archive blob |
-| Refresh | every device polls `GET /api/beds` every 5 seconds |
-| Writes | `POST /api/bed/:id` immediately on every edit |
-| Conflicts | last write wins, per bed |
+| Storage | Netlify Blobs, one JSON blob for the active baby |
+| Refresh | every device polls `GET /api/bed/1` every 5 seconds |
+| Writes | `POST /api/bed/1` immediately on every edit |
+| Conflicts | last write wins |
 | Clock | timers anchor to server time, so a device with a wrong clock still shows the right elapsed time |
 
 ### Offline
@@ -60,41 +66,21 @@ automatically when the connection returns. The header chip shows the state:
 
 - **Synced** — talking to the server
 - **Offline · queued** — edits saved locally, will push on reconnect
-- **This device only** — no backend reachable at all (e.g. opening `index.html` from disk).
-  The app is fully usable, it just doesn't share.
+- **This device only** — no backend reachable (e.g. opening `index.html` from disk)
 
-Because last write wins, a device that was offline for a long time can overwrite newer work from
-another device when it reconnects. For a single unit editing distinct beds this is rarely an
-issue, but it is the tradeoff that was chosen for simplicity.
+Because last write wins, two people editing at the same moment can overwrite each other's most
+recent change, and a device that was offline for a long time can overwrite newer work when it
+reconnects. A reset on one device clears the record everywhere.
 
 ---
-
-## API
-
-| Method | Path | Purpose |
-|---|---|---|
-| GET | `/api/beds` | whole unit snapshot + archive + server time |
-| GET | `/api/bed/:id` | one bed |
-| POST | `/api/bed/:id` | `{ doc }` writes a bed, `{ doc: null }` frees it |
-| GET | `/api/archive` | completed runs, newest first |
-| POST | `/api/archive` | `{ entry }` prepends a completed run |
-
-## Bed lifecycle
-
-Tap an empty bed to admit. Tap **Archive & free bed** when cooling ends or the baby moves — the
-run moves to **Completed runs** on the board and the bed returns to empty. The archive holds the
-most recent 500 runs and exports to CSV.
 
 ## Editing the app
 
-`public/index.html` is a compiled single file. It is generated from the source design component
-`HIE Acute Checklist.dc.html`; regenerate and replace it rather than hand-editing.
-
----
+`public/index.html` is a compiled single file generated from `HIE Acute Checklist.dc.html`.
+Regenerate and replace it rather than hand-editing.
 
 ## A note on scope
 
 The site is public to anyone with the URL and stores no identifiers, which is what keeps it
-outside PHI territory. If you later want names, MRNs, or an audit trail of who checked what, that
-changes the compliance picture and the app needs authentication and a BAA-covered backend before
-it goes near real patients. Talk to your institution's privacy office first.
+outside PHI territory. Adding names, MRNs, or an audit trail would need authentication and a
+BAA-covered backend. Talk to your institution's privacy office first.
