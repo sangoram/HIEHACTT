@@ -49,8 +49,11 @@ variables, or database setup steps.
   (first hour expanded so 10- and 30-minute deadlines are readable).
 - **Transport handoff summary** — one tap builds a copy-ready note: birth data, Apgars, eligibility with criteria,
   all gases, Sarnat series in prose, key times, completed and outstanding tasks.
-- **Faster gas entry** — one row per gas with large inputs; base excess defaults to negative with a sign toggle;
-  "705" becomes 7.05; baby gases time-stamp themselves; each row shows Severe (A) / Moderate (B).
+- **Header edits save on Enter / Save** — birth time, weight and GA can be corrected without half-typed values
+  syncing; weight accepts kg (3.45) or grams (3450); GA accepts 39+2, 39 2/7, 39w2d, 39.2 or 39.
+- **Gas form** — pick Cord arterial / Cord venous / Baby gas, enter pH, pCO₂, BE, then Save. Nothing reaches the
+  verdict until saved; saved gases list with Edit / ✕; out-of-range values are blocked. pO₂ removed.
+- **Preview isolation** — deploy previews and branch deploys store their record separately from production.
 - **Safety** — no more prefilled example gases (old records are cleaned on load); 35 0/7–35 6/7 wk shows
   "discuss with family / cooling center" instead of ineligible; duplicate placenta item removed; Reset now requires
   typing RESET.

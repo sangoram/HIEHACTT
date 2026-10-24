@@ -7,7 +7,9 @@ export default async (req, context) => {
   const id = String(context.params.id || '').replace(/[^0-9]/g, '');
   if (!id) return new Response('bad bed id', { status: 400 });
 
-  const key = 'bed-' + id;
+  // Keep deploy previews and branch deploys from reading or overwriting the production record.
+  const ctx = (context && context.deploy && context.deploy.context) || 'production';
+  const key = (ctx === 'production' ? '' : ctx + '-') + 'bed-' + id;
 
   if (req.method === 'POST') {
     let body = {};
