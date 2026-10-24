@@ -39,6 +39,22 @@ variables, or database setup steps.
 
 ---
 
+## What's new in demo-v2 (Oct 2026)
+
+- **Cooling decision · live** — a summary card that combines entry criteria, physiologic criterion (A / B+D / C+D)
+  and the latest Sarnat exam into one verdict, with Entry / Physiology / Neuro status pills.
+- **Do next** — overdue timers first, then missing decision data, then the next time-critical tasks, each with a
+  one-tap Done or Go.
+- **First-hours timeline** — birth → now → 6-h cooling window, with completed tasks, gases and Sarnat exams plotted
+  (first hour expanded so 10- and 30-minute deadlines are readable).
+- **Transport handoff summary** — one tap builds a copy-ready note: birth data, Apgars, eligibility with criteria,
+  all gases, Sarnat series in prose, key times, completed and outstanding tasks.
+- **Faster gas entry** — one row per gas with large inputs; base excess defaults to negative with a sign toggle;
+  "705" becomes 7.05; baby gases time-stamp themselves; each row shows Severe (A) / Moderate (B).
+- **Safety** — no more prefilled example gases (old records are cleaned on load); 35 0/7–35 6/7 wk shows
+  "discuss with family / cooling center" instead of ineligible; duplicate placenta item removed; Reset now requires
+  typing RESET.
+
 ## Flow
 
 1. **Admit baby** — the start screen is one large button. Set time of birth (defaults to now)
@@ -46,7 +62,7 @@ variables, or database setup steps.
 2. **Checklist** — the header shows birth time, weight, Apgars (once you tap **Done** on the
    Apgar table), UVC / UAC / ETT depths, age, and the cooling-window countdown. Entering a cord
    gas ticks "Obtain cord gases"; entering a weight ticks "Enter birth weight".
-3. **Reset data** — after confirming, wipes the record on every device and returns to the
+3. **Reset data** — after typing RESET to confirm, wipes the record on every device and returns to the
    Admit screen.
 
 ## How sync works
