@@ -57,6 +57,8 @@ variables, or database setup steps.
 - **Active patients** — the home screen lists every active baby, grouped by center of birth
   (SLN, OAK, ROS, SF, SCL, WCR, LVL2) and sorted by date/time of birth. Admitting requires choosing a center;
   the header shows ← Patients, a center selector and Remove patient (type RESET to confirm).
+- **Modified Sarnat evaluations** — renamed throughout; each logged evaluation can be edited (findings and time
+  performed) or deleted; logging uses a Time performed field and shows hour of life.
 - **Feedback** — a Feedback button (header and admit screen) posts comments to a Netlify Form named
   `feedback`; set an email notification for that form in Netlify to receive them. If posting fails, the box offers a
   pre-filled email instead.
