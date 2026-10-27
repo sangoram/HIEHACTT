@@ -1,11 +1,12 @@
 # HACTT — HIE Acute Care Task Tool
 
-A shared, live-syncing checklist for therapeutic hypothermia in neonatal HIE. The app holds one
-active baby at a time. Any device that opens the site sees the same record; birth time, timers,
+A shared, live-syncing checklist for therapeutic hypothermia in neonatal HIE. The app holds any number of
+active babies, each identified only by center of birth and date/time of birth. Any device that opens the site sees the same record; birth time, timers,
 checklist items, Apgars, blood gases and Sarnat exams sync across devices within about five
 seconds.
 
-**No patient identifiers are stored.** A record is clinical data only.
+**No names or MRNs are stored.** Each record carries center of birth and date/time of birth, which are
+identifiers under HIPAA Safe Harbor — review with your privacy office, and consider an access code.
 
 This is a decision-support prototype, not a substitute for clinical judgment.
 
@@ -53,6 +54,9 @@ variables, or database setup steps.
   syncing; weight accepts kg (3.45) or grams (3450); GA accepts 39+2, 39 2/7, 39w2d, 39.2 or 39.
 - **Gas form** — pick Cord arterial / Cord venous / Baby gas, enter pH, pCO₂, BE, then Save. Nothing reaches the
   verdict until saved; saved gases list with Edit / ✕; out-of-range values are blocked. pO₂ removed.
+- **Active patients** — the home screen lists every active baby, grouped by center of birth
+  (SLN, OAK, ROS, SF, SCL, WCR, LVL2) and sorted by date/time of birth. Admitting requires choosing a center;
+  the header shows ← Patients, a center selector and Remove patient (type RESET to confirm).
 - **Feedback** — a Feedback button (header and admit screen) posts comments to a Netlify Form named
   `feedback`; set an email notification for that form in Netlify to receive them. If posting fails, the box offers a
   pre-filled email instead.
