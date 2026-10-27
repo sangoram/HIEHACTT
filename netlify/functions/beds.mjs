@@ -1,24 +1,31 @@
 import { getStore } from '@netlify/blobs';
 
-// GET /api/beds — full unit snapshot, polled by every device every 5s.
-export default async () => {
+// GET /api/beds — list of active patients (summary fields only), polled by the home screen.
+// Records are keyed by deploy context so previews never read production data.
+export default async (req, context) => {
   const store = getStore('hactt');
-  const { blobs } = await store.list({ prefix: 'bed-' });
+  const ctx = (context && context.deploy && context.deploy.context) || 'production';
+  const prefix = (ctx === 'production' ? '' : ctx + '-') + 'bed-';
+  const { blobs } = await store.list({ prefix });
 
-  const entries = await Promise.all(
+  const patients = (await Promise.all(
     blobs.map(async (b) => {
       const doc = await store.get(b.key, { type: 'json' });
-      return [b.key.slice(4), doc];
+      if (!doc) return null;
+      return {
+        id: b.key.slice(prefix.length),
+        center: doc.center || '',
+        birth: doc.birth || null,
+        ga: doc.ga || null,
+        bw: doc.bw || '',
+        updatedAt: doc.updatedAt || null,
+        summary: doc.summary || null,
+      };
     })
-  );
-
-  const beds = {};
-  for (const [id, doc] of entries) if (doc) beds[id] = doc;
-
-  const archive = (await store.get('archive', { type: 'json' })) || [];
+  )).filter(Boolean);
 
   return Response.json(
-    { beds, archive, serverTime: Date.now() },
+    { patients, serverTime: Date.now() },
     { headers: { 'cache-control': 'no-store' } }
   );
 };
