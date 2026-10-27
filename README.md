@@ -53,6 +53,10 @@ variables, or database setup steps.
   syncing; weight accepts kg (3.45) or grams (3450); GA accepts 39+2, 39 2/7, 39w2d, 39.2 or 39.
 - **Gas form** — pick Cord arterial / Cord venous / Baby gas, enter pH, pCO₂, BE, then Save. Nothing reaches the
   verdict until saved; saved gases list with Edit / ✕; out-of-range values are blocked. pO₂ removed.
+- **Feedback** — a Feedback button (header and admit screen) posts comments to a Netlify Form named
+  `feedback`; set an email notification for that form in Netlify to receive them. If posting fails, the box offers a
+  pre-filled email instead.
+- **Sarnat trend** — header and handoff show the exam series (e.g. 5 → 2, improving); cord gas appears on the timeline.
 - **Preview isolation** — deploy previews and branch deploys store their record separately from production.
 - **Safety** — no more prefilled example gases (old records are cleaned on load); 35 0/7–35 6/7 wk shows
   "discuss with family / cooling center" instead of ineligible; duplicate placenta item removed; Reset now requires
