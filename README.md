@@ -40,6 +40,23 @@ variables, or database setup steps.
 
 ---
 
+## What's new in demo-v3 (Nov 2026)
+
+- **Layout** — the first-hours timeline now sits at the bottom of the header (Hide / Show folds it away). Blood-gas
+  entry and modified Sarnat scoring are two cards side by side directly under the header, followed by the cooling
+  decision, Do next, and the checklist cards. Card 2 · Step 3 shows the latest Sarnat result and links up to the card.
+- **Lists are editable per baby** — every card has an *Add a to-do* box and an *Edit list* button: reword an item,
+  flag it time-critical, remove it (standard items can be restored; added ones are deleted), or restore the standard
+  list. *Add a card* at the bottom creates a new card for this baby. Edits are stored on that baby's record
+  (`custom`), sync to every device viewing the baby, appear in the handoff summary, and never touch the standard
+  list — the next admission starts clean. Edited cards and items are labelled.
+- **List-change log** — each edit is posted to `/api/edits` (queued on the device while offline). View it at
+  `/list-changes.html`: counts, the most frequent changes, the full log, and a CSV download
+  (`/api/edits?format=csv`). Entries hold center, age in hours, a short record tag and the item text — no names,
+  MRNs or birth times. The log is as public as the site; to require a key for reading it, add a
+  `HACTT_LOG_KEY` environment variable in Netlify and open `/list-changes.html?key=<value>`.
+- The header is sticky only on wide, tall windows (over 760 px wide and 900 px tall); otherwise it scrolls with the page.
+
 ## What's new in demo-v2 (Oct 2026)
 
 - **Cooling decision · live** — a summary card that combines entry criteria, physiologic criterion (A / B+D / C+D)
@@ -105,8 +122,9 @@ reconnects. A reset on one device clears the record everywhere.
 
 ## Editing the app
 
-`public/index.html` is a compiled single file generated from `HIE Acute Checklist.dc.html`.
-Regenerate and replace it rather than hand-editing.
+`public/index.html` is a compiled single-file bundle. The app's markup and logic live as a JSON string inside
+`<script type="__bundler/template">`: unpack it, edit, and re-encode (`json.dumps(..., ensure_ascii=False)` with
+`</` written as `<\u002F`) rather than hand-editing the file.
 
 ## A note on scope
 
