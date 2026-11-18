@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HACTT — list-change log</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#f5f1ea;color:#2c2825;font:14px/1.45 'Source Sans 3',system-ui,-apple-system,sans-serif;font-variant-numeric:tabular-nums}
+  main{max-width:1100px;margin:0 auto;padding:22px 22px 60px}
+  h1{font:700 24px/1.2 'Source Serif 4',Georgia,serif;margin:0 0 4px;letter-spacing:-.01em}
+  h2{font:700 17px/1.2 'Source Serif 4',Georgia,serif;margin:26px 0 8px}
+  .sub{color:#8a7f70;font-size:13px;max-width:70ch}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:14px 0 4px}
+  a.btn,button.btn{border:1px solid #5f8d75;background:#5f8d75;color:#fff;border-radius:10px;padding:8px 13px;font:700 12.5px/1 inherit;text-decoration:none;cursor:pointer}
+  a.btn.ghost,button.btn.ghost{background:#fdfbf7;color:#4a443d;border-color:#d8cdbb}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:#e6ddd0;border:1px solid #e6ddd0;border-radius:14px;overflow:hidden;margin-top:14px}
+  .tile{background:#fdfbf7;padding:10px 13px}
+  .tile b{display:block;font-size:22px;line-height:1.15}
+  .tile span{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#a59a8d}
+  .wrap{background:#fdfbf7;border:1px solid #e6ddd0;border-radius:14px;overflow-x:auto}
+  table{border-collapse:collapse;width:100%;min-width:640px}
+  th{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8a7f70;text-align:left;padding:9px 12px;border-bottom:1px solid #e6ddd0;white-space:nowrap}
+  td{padding:8px 12px;border-bottom:1px solid #f1ead5;vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.n{font-weight:700;text-align:right;white-space:nowrap}
+  td.w{white-space:nowrap;color:#6f665c}
+  .pill{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px;white-space:nowrap}
+  .add{color:#3f6b52;background:#e7efe9}.rem{color:#9c5238;background:#f2e2da}.edit{color:#6b5ea8;background:#eceaf6}.other{color:#6f665c;background:#efe8dc}
+  .from{color:#8a7f70;text-decoration:line-through}
+  .muted{color:#a59a8d}
+  #msg{margin-top:16px;padding:12px 14px;border-radius:12px;background:#f6ecd6;color:#8a6620;font-weight:600;display:none}
+</style>
+</head>
+<body>
+<main>
+  <h1>HACTT — list-change log</h1>
+  <div class="sub">Every time someone adds, rewords, removes or restores an item on a baby’s copy of the checklist, the change is recorded here. No names, MRNs or birth times are stored — only the center, the baby’s age in hours, and the text of the item.</div>
+  <div class="bar">
+    <a class="btn" id="csv" href="/api/edits?format=csv">Download CSV</a>
+    <button class="btn ghost" id="reload">Refresh</button>
+    <a class="btn ghost" href="/">← Back to HACTT</a>
+    <span class="muted" id="stamp"></span>
+  </div>
+  <div id="msg"></div>
+  <div class="tiles" id="tiles"></div>
+
+  <h2>What people change most</h2>
+  <div class="sub">Grouped by item. Standard items that are removed or reworded often, and to-dos that are added repeatedly, are the best candidates for changing the standard list.</div>
+  <div class="wrap" style="margin-top:8px"><table id="top"><thead><tr><th>Change</th><th>Card</th><th>Item</th><th>Centers</th><th style="text-align:right">Times</th></tr></thead><tbody></tbody></table></div>
+
+  <h2>Full log · newest first</h2>
+  <div class="wrap"><table id="log"><thead><tr><th>When</th><th>Center</th><th>Age</th><th>Change</th><th>Card</th><th>Detail</th></tr></thead><tbody></tbody></table></div>
+</main>
+<script>
+(function () {
+  var LABEL = {
+    add_item: ['Added to-do', 'add'], edit_item: ['Reworded', 'edit'], remove_item: ['Removed', 'rem'], restore_item: ['Restored', 'other'],
+    restore_wording: ['Restored wording', 'other'], flag_critical: ['Flagged time-critical', 'edit'], unflag_critical: ['Unflagged time-critical', 'edit'],
+    add_card: ['Added card', 'add'], rename_card: ['Renamed card', 'edit'], remove_card: ['Deleted card', 'rem'], restore_card: ['Restored standard card', 'other']
+  };
+  var key = new URLSearchParams(location.search).get('key') || '';
+  var q = key ? '?key=' + encodeURIComponent(key) : '';
+  document.getElementById('csv').href = '/api/edits?format=csv' + (key ? '&key=' + encodeURIComponent(key) : '');
+
+  function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+  function pill(action) { var l = LABEL[action] || [action, 'other']; return el('span', 'pill ' + l[1], l[0]); }
+  function when(t) { var d = new Date(t); return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }); }
+  function detail(e) {
+    var td = el('td');
+    if (e.from && e.to) { td.appendChild(el('span', 'from', e.from)); td.appendChild(document.createTextNode(' → ' + e.to)); }
+    else td.textContent = e.to || e.from || '';
+    if (e.itemId && !e.itemStd) td.appendChild(el('span', 'muted', '  · added item'));
+    return td;
+  }
+
+  function render(entries) {
+    var tiles = document.getElementById('tiles'); tiles.textContent = '';
+    var count = function (f) { return entries.filter(f).length; };
+    var recs = {}; entries.forEach(function (e) { recs[e.rec] = 1; });
+    [[entries.length, 'Changes logged'], [Object.keys(recs).length, 'Babies with edits'],
+     [count(function (e) { return e.action === 'add_item'; }), 'To-dos added'],
+     [count(function (e) { return e.action === 'remove_item' && e.itemStd; }), 'Standard items removed'],
+     [count(function (e) { return e.action === 'edit_item' && e.itemStd; }), 'Standard items reworded'],
+     [count(function (e) { return e.action === 'add_card'; }), 'Cards added']
+    ].forEach(function (p) { var t = el('div', 'tile'); t.appendChild(el('b', null, String(p[0]))); t.appendChild(el('span', null, p[1])); tiles.appendChild(t); });
+
+    // group: standard items by id, added items by their text
+    var groups = {};
+    entries.forEach(function (e) {
+      if (['add_item', 'edit_item', 'remove_item', 'flag_critical', 'unflag_critical', 'add_card'].indexOf(e.action) < 0) return;
+      var text = e.action === 'add_item' || e.action === 'add_card' ? e.to : e.from;
+      var k = e.action + '|' + (e.itemStd ? e.itemId : String(text || '').trim().toLowerCase());
+      var g = groups[k] || (groups[k] = { action: e.action, card: e.card, text: text, n: 0, centers: {}, std: e.itemStd });
+      g.n++; if (e.center) g.centers[e.center] = 1;
+    });
+    var top = Object.keys(groups).map(function (k) { return groups[k]; }).sort(function (a, b) { return b.n - a.n; }).slice(0, 40);
+    var tb = document.querySelector('#top tbody'); tb.textContent = '';
+    top.forEach(function (g) {
+      var tr = el('tr'); var a = el('td'); a.appendChild(pill(g.action)); tr.appendChild(a);
+      tr.appendChild(el('td', 'w', g.card)); tr.appendChild(el('td', null, g.text));
+      tr.appendChild(el('td', 'w', Object.keys(g.centers).join(', '))); tr.appendChild(el('td', 'n', String(g.n))); tb.appendChild(tr);
+    });
+    if (!top.length) { var r = el('tr'); var c = el('td', 'muted', 'No changes logged yet.'); c.colSpan = 5; r.appendChild(c); tb.appendChild(r); }
+
+    var lb = document.querySelector('#log tbody'); lb.textContent = '';
+    entries.slice(0, 1000).forEach(function (e) {
+      var tr = el('tr'); tr.appendChild(el('td', 'w', when(e.t))); tr.appendChild(el('td', 'w', e.center || '—'));
+      tr.appendChild(el('td', 'w', (e.ageH != null ? e.ageH : '—') + ' h')); var a = el('td'); a.appendChild(pill(e.action)); tr.appendChild(a);
+      tr.appendChild(el('td', 'w', e.card)); tr.appendChild(detail(e)); lb.appendChild(tr);
+    });
+    if (!entries.length) { var r2 = el('tr'); var c2 = el('td', 'muted', 'No changes logged yet.'); c2.colSpan = 6; r2.appendChild(c2); lb.appendChild(r2); }
+    document.getElementById('stamp').textContent = 'Updated ' + new Date().toLocaleTimeString() + (entries.length > 1000 ? ' · showing the newest 1,000 — the CSV has all ' + entries.length : '');
+  }
+
+  function load() {
+    var msg = document.getElementById('msg'); msg.style.display = 'none';
+    fetch('/api/edits' + q, { cache: 'no-store' }).then(function (r) {
+      if (r.status === 401) throw new Error('This log needs its key — open this page as list-changes.html?key=…');
+      if (!r.ok) throw new Error('Could not load the log (' + r.status + ').');
+      return r.json();
+    }).then(function (j) { render(j.entries || []); }).catch(function (e) { msg.textContent = e.message || 'Could not load the log.'; msg.style.display = 'block'; render([]); });
+  }
+  document.getElementById('reload').onclick = load;
+  load();
+})();
+</script>
+</body>
+</html>
