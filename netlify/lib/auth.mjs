@@ -12,13 +12,16 @@ import crypto from 'node:crypto';
 export const DEFAULT_SITES = ['SLN', 'OAK', 'ROS', 'SF', 'SCL', 'WCR', 'LVL2'].map((id) => ({ id, name: '' })).concat([{ id: 'STAN', name: 'Stanford' }]);
 export const CENTERS = DEFAULT_SITES.map((s) => s.id);
 export async function getSites(context) {
-  return (await getStore('hactt').get(prefix(context) + 'auth-sites', { type: 'json' })) || DEFAULT_SITES;
+  return (await store().get(prefix(context) + 'auth-sites', { type: 'json' })) || DEFAULT_SITES;
 }
 export async function centerIds(context) { return (await getSites(context)).map((s) => s.id); }
 const CENTER_TTL = 14 * 24 * 3600 * 1000;
 const ADMIN_TTL = 12 * 3600 * 1000;
 
-export const store = () => getStore('hactt');
+// Strong consistency: every read sees the latest write. Netlify's default ("eventual") can serve an older copy
+// for up to a minute after a write, which made code changes, list edits and synced patient data look like they
+// hadn't saved until a later refresh.
+export function store() { return getStore({ name: 'hactt', consistency: 'strong' }); }
 
 // Deploy previews and branch deploys keep their own records, codes and logs.
 export function prefix(context) {
