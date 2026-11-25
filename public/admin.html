@@ -54,6 +54,15 @@
         <tbody id="centers"></tbody>
       </table>
       <div class="msg" id="codeMsg"></div>
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid #f1ead5">
+        <b style="font-size:13.5px">Add a site</b>
+        <div class="sub">A new site appears on the sign-in screen but stays off until you set its team code — do that once you’ve briefed the team. It starts from the current master list.</div>
+        <div class="bar" style="margin-top:8px">
+          <input id="newId" placeholder="Code, e.g. STAN" maxlength="8" style="width:150px;text-transform:uppercase">
+          <input id="newName" placeholder="Full name, e.g. Stanford" maxlength="40" style="flex:1 1 220px">
+          <button id="addSite">Add site</button>
+        </div>
+      </div>
     </section>
 
     <section class="tab" id="tab-master" style="display:none">
@@ -98,7 +107,7 @@
     <div class="msg" id="topMsg" style="position:sticky;bottom:12px"></div>
   </div>
 </main>
-<footer>Copyright © 2025 Ashvin Sangoram. All rights reserved.</footer>
+<footer>Copyright © 2026 Ashvin Sangoram. All rights reserved.</footer>
 <script src="/list-editor.js"></script>
 <script>
 (function () {
@@ -147,9 +156,10 @@
       .then(function (res) {
         var status = res[0], beds = res[1].patients || [], counts = {};
         beds.forEach(function (p) { counts[p.center || '—'] = (counts[p.center || '—'] || 0) + 1; });
+        drawSitePick(status.centers || []);
         var tb = $('centers'); tb.textContent = '';
         (status.centers || []).forEach(function (c) {
-          var tr = el('tr'); tr.appendChild(el('td', 'c', c.center)); tr.appendChild(codeCell(c, 'team')); tr.appendChild(codeCell(c, 'lead'));
+          var tr = el('tr'); var nm = el('td', 'c', c.center); if (c.name) { nm.appendChild(el('div', 'muted', c.name)); } tr.appendChild(nm); tr.appendChild(codeCell(c, 'team')); tr.appendChild(codeCell(c, 'lead'));
           tr.appendChild(el('td', null, String(counts[c.center] || 0)));
           var l = el('td'); var a = el('a', 'btn ghost', 'View / edit'); a.href = '/site.html?center=' + c.center; l.appendChild(a); tr.appendChild(l);
           tb.appendChild(tr);
@@ -163,8 +173,10 @@
   }
 
   // ---------- master list & updates ----------
-  var CENTERS = ['SLN', 'OAK', 'ROS', 'SF', 'SCL', 'WCR', 'LVL2'];
-  CENTERS.forEach(function (c) { var l = el('label'); var i = el('input'); i.type = 'checkbox'; i.value = c; l.appendChild(i); l.appendChild(document.createTextNode(c)); $('sitePick').appendChild(l); });
+  function drawSitePick(centers) {
+    var box = $('sitePick'), keep = {}; box.querySelectorAll('input:checked').forEach(function (i) { keep[i.value] = 1; }); box.textContent = '';
+    centers.forEach(function (c) { var l = el('label'); var i = el('input'); i.type = 'checkbox'; i.value = c.center; i.checked = !!keep[c.center]; l.appendChild(i); l.appendChild(document.createTextNode(c.center + (c.name ? ' · ' + c.name : ''))); box.appendChild(l); });
+  }
   document.querySelectorAll('input[name=tg]').forEach(function (r) { r.onchange = function () { $('sitePick').style.display = document.querySelector('input[name=tg]:checked').value === 'some' ? 'block' : 'none'; }; });
   function drawMaster(j) {
     ListEditor.render($('master'), j.master.preview, { editable: true, newTag: 'Unpublished', onOps: function (ops) { return mpost({ action: 'draftOps', ops: ops }, 'Added to your unpublished changes.'); } });
@@ -197,6 +209,12 @@
     mpost({ action: 'publish', note: $('note').value, required: req, targets: tg }, 'Published.').then(function () { $('note').value = ''; $('required').checked = false; });
   };
   $('discard').onclick = function () { if (confirm('Discard all unpublished changes?')) mpost({ action: 'draftClear' }, 'Discarded.'); };
+
+  $('addSite').onclick = function () {
+    var id = $('newId').value.trim().toUpperCase(), name = $('newName').value.trim();
+    post('/api/auth', { action: 'addSite', id: id, name: name }).then(function () { $('newId').value = ''; $('newName').value = ''; show($('codeMsg'), id + ' added. Set its team code when the site is ready to start.', true); loadCodes(); })
+      .catch(function (e) { show($('codeMsg'), e.message, false); });
+  };
 
   // ---------- data ----------
   function download(url, name) {

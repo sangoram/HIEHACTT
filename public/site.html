@@ -38,11 +38,10 @@
     <div id="own"></div>
   </section>
 </main>
-<footer>Copyright © 2025 Ashvin Sangoram. All rights reserved.</footer>
+<footer>Copyright © 2026 Ashvin Sangoram. All rights reserved.</footer>
 <script src="/list-editor.js"></script>
 <script>
 (function () {
-  var CENTERS = ['SLN', 'OAK', 'ROS', 'SF', 'SCL', 'WCR', 'LVL2'];
   var $ = function (id) { return document.getElementById(id); };
   var auth = null; try { auth = JSON.parse(localStorage.getItem('hactt_auth_v1')); } catch (e) {}
   if (!auth || !(auth.exp > Date.now())) { document.querySelector('main').innerHTML = '<h1>Site list</h1><div class="card">Sign in to HIE-NeuroSafe first, then come back. <a class="btn" href="/">Sign in</a></div>'; return; }
@@ -59,7 +58,7 @@
   }
   if (admin) {
     $('adminPick').style.display = 'inline'; $('adminLink').style.display = 'inline-block';
-    CENTERS.forEach(function (c) { var o = el('option', null, c); o.value = c; if (c === center) o.selected = true; $('center').appendChild(o); });
+    fetch('/api/auth', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (s) { (s.centers || []).forEach(function (c) { var o = el('option', null, c.center + (c.name ? ' · ' + c.name : '')); o.value = c.center; if (c.center === center) o.selected = true; $('center').appendChild(o); }); });
     $('center').onchange = function () { center = this.value; history.replaceState(null, '', '?center=' + center); load(); };
   }
   $('who').textContent = admin ? 'Signed in as admin' : (auth.lead ? center + ' site lead' : center + ' team (view only)');

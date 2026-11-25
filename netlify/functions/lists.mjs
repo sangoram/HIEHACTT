@@ -1,4 +1,4 @@
-import { CENTERS, getAuth, deny } from '../lib/auth.mjs';
+import { centerIds, getAuth, deny } from '../lib/auth.mjs';
 import { loadMaster, saveMaster, loadSite, saveSite, lastSeq, cleanOp, masterView, siteView, statusBoard, logChanges } from '../lib/lists.mjs';
 
 // GET  /api/lists?center=C   → that site's list, the admin updates it received (with each change's status), its own changes
@@ -16,6 +16,7 @@ export default async (req, context) => {
   const url = new URL(req.url);
   const m = await loadMaster(context);
   const headers = { 'cache-control': 'no-store' };
+  const CENTERS = await centerIds(context);
 
   if (req.method !== 'POST') {
     const c = isAdmin ? url.searchParams.get('center') : who.center;

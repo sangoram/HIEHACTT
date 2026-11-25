@@ -7,7 +7,14 @@ import crypto from 'node:crypto';
 // - A successful sign-in returns a signed token. Center tokens last 14 days; admin tokens 12 hours.
 //   Changing a center's code signs everyone at that center out (the token carries the code's version).
 
-export const CENTERS = ['SLN', 'OAK', 'ROS', 'SF', 'SCL', 'WCR', 'LVL2'];
+// Sites the tool knows about. The admin can add more from the admin console (stored as <prefix>auth-sites).
+// A site only becomes usable once the admin sets its team code.
+export const DEFAULT_SITES = ['SLN', 'OAK', 'ROS', 'SF', 'SCL', 'WCR', 'LVL2'].map((id) => ({ id, name: '' })).concat([{ id: 'STAN', name: 'Stanford' }]);
+export const CENTERS = DEFAULT_SITES.map((s) => s.id);
+export async function getSites(context) {
+  return (await getStore('hactt').get(prefix(context) + 'auth-sites', { type: 'json' })) || DEFAULT_SITES;
+}
+export async function centerIds(context) { return (await getSites(context)).map((s) => s.id); }
 const CENTER_TTL = 14 * 24 * 3600 * 1000;
 const ADMIN_TTL = 12 * 3600 * 1000;
 
@@ -60,7 +67,7 @@ export async function getAuth(req, context) {
   const p = readToken(h.replace(/^Bearer\s+/i, ''));
   if (!p) return null;
   if (p.r === 'admin') return { role: 'admin' };
-  if (p.r === 'center' && CENTERS.includes(p.c)) {
+  if (p.r === 'center' && p.c) {
     const rec = (await centerCodes(context))[p.c];
     if (p.l) { if (!rec || !rec.lead || rec.lead.v !== p.l) return null; return { role: 'center', center: p.c, lead: true }; }
     if (!rec || rec.v !== p.v) return null; // code changed or disabled since this token was issued

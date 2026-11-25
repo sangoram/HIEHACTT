@@ -1,5 +1,5 @@
 import BASE from './base-list.mjs';
-import { store, prefix, CENTERS, centerCodes } from './auth.mjs';
+import { store, prefix, centerIds, centerCodes } from './auth.mjs';
 
 // Three layers of checklist content:
 //   master list  = the built-in list + every published admin update sent to all sites
@@ -108,11 +108,11 @@ export function siteView(m, site, c) {
 
 // Per-site status of each published update, for the admin console.
 export async function statusBoard(context, m) {
-  const sites = {}, codes = await centerCodes(context);
-  for (const c of CENTERS) sites[c] = await loadSite(context, c);
+  const sites = {}, codes = await centerCodes(context), ids = await centerIds(context);
+  for (const c of ids) sites[c] = await loadSite(context, c);
   return (m.updates || []).slice().sort((a, b) => b.seq - a.seq).map((u) => ({
     id: u.id, seq: u.seq, at: u.at, note: u.note, required: !!u.required, targets: u.targets, count: u.ops.length,
-    sites: CENTERS.filter((c) => targets(u, c)).map((c) => {
+    sites: ids.filter((c) => targets(u, c)).map((c) => {
       const s = sites[c]; const dec = (s.decisions || {})[u.id] || {};
       if (!codes[c]) return { center: c, state: 'off' };
       if (u.required) return { center: c, state: 'required' };

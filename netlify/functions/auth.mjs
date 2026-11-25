@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { CENTERS, store, prefix, adminKey, hashCode, issue, getAuth, centerCodes, deny, sameCode } from '../lib/auth.mjs';
+import { getSites, store, prefix, adminKey, hashCode, issue, getAuth, centerCodes, deny, sameCode } from '../lib/auth.mjs';
 import { loadMaster, loadSite, saveSite, lastSeq } from '../lib/lists.mjs';
 
 // GET  /api/auth                       → which centers have a team code, whether the admin key is configured
@@ -9,6 +9,7 @@ import { loadMaster, loadSite, saveSite, lastSeq } from '../lib/lists.mjs';
 // POST /api/auth { action: 'setLead', center, code }   (admin) → set or change a center's site-lead code
 // POST /api/auth { action: 'disable', center }         (admin) → turn a center's sign-in off (team and lead)
 // POST /api/auth { action: 'disableLead', center }     (admin) → turn off only the site-lead code
+// POST /api/auth { action: 'addSite', id, name }       (admin) → add a site (it stays off until its team code is set)
 // The same sign-in box takes either code: the lead code signs in as site lead.
 // After 8 wrong codes from one network address within 15 minutes, that address may try only once every
 // 30 seconds. Nobody is locked out, and devices already signed in are never affected.
@@ -29,11 +30,12 @@ export default async (req, context) => {
   const p = prefix(context);
   const ip = String((context && context.ip) || req.headers.get('x-nf-client-connection-ip') || 'na').replace(/[^0-9a-fA-F:.]/g, '').slice(0, 45);
   const codes = await centerCodes(context);
+  const sites = await getSites(context), CENTERS = sites.map((s) => s.id);
 
   if (req.method !== 'POST') {
     return Response.json({
       adminConfigured: adminKey().length >= 8,
-      centers: CENTERS.map((c) => ({ center: c, ready: !!codes[c], setAt: codes[c] ? codes[c].setAt : null, leadReady: !!(codes[c] && codes[c].lead), leadSetAt: codes[c] && codes[c].lead ? codes[c].lead.setAt : null })),
+      centers: sites.map(({ id: c, name }) => ({ center: c, name: name || '', ready: !!codes[c], setAt: codes[c] ? codes[c].setAt : null, leadReady: !!(codes[c] && codes[c].lead), leadSetAt: codes[c] && codes[c].lead ? codes[c].lead.setAt : null })),
     }, { headers: { 'cache-control': 'no-store' } });
   }
 
@@ -45,6 +47,13 @@ export default async (req, context) => {
   if (body.action) {
     const who = await getAuth(req, context);
     if (!who || who.role !== 'admin') return deny(403, 'admin only');
+    if (body.action === 'addSite') {
+      const id = String(body.id || '').trim().toUpperCase(), name = String(body.name || '').trim().slice(0, 40);
+      if (!/^[A-Z][A-Z0-9]{1,7}$/.test(id)) return deny(400, 'Site codes are 2–8 letters or numbers, starting with a letter (e.g. STAN).');
+      if (CENTERS.includes(id)) return deny(400, id + ' already exists.');
+      await store().setJSON(p + 'auth-sites', sites.concat([{ id, name, addedAt: Date.now() }]));
+      return Response.json({ ok: true, center: id });
+    }
     const c = String(body.center || '');
     if (!CENTERS.includes(c)) return deny(400, 'unknown center');
     const code = String(body.code || '').trim();
