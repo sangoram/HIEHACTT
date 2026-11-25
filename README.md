@@ -1,4 +1,4 @@
-# HACTT — HIE Acute Care Task Tool
+# HIE-NeuroSafe (formerly HACTT, HIE Acute Care Task Tool)
 
 A shared, live-syncing checklist for therapeutic hypothermia in neonatal HIE. The app holds any number of
 active babies, each identified only by center of birth and date/time of birth. Any device that opens the site sees the same record; birth time, timers,
