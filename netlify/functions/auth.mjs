@@ -10,6 +10,9 @@ import { loadMaster, loadSite, saveSite, lastSeq } from '../lib/lists.mjs';
 // POST /api/auth { action: 'disable', center }         (admin) → turn a center's sign-in off (team and lead)
 // POST /api/auth { action: 'disableLead', center }     (admin) → turn off only the site-lead code
 // POST /api/auth { action: 'addSite', id, name }       (admin) → add a site (it stays off until its team code is set)
+// POST /api/auth { action: 'renameSite', center, name } (admin) → change a site's full name (its code stays the same)
+// POST /api/auth { action: 'deleteSite', center }      (admin) → delete a site with no active patients: its codes and
+//                                                       site list go; removed-patient records and the change log stay
 // The same sign-in box takes either code: the lead code signs in as site lead.
 // After 8 wrong codes from one network address within 15 minutes, that address may try only once every
 // 30 seconds. Nobody is locked out, and devices already signed in are never affected.
@@ -53,6 +56,24 @@ export default async (req, context) => {
       if (CENTERS.includes(id)) return deny(400, id + ' already exists.');
       await store().setJSON(p + 'auth-sites', sites.concat([{ id, name, addedAt: Date.now() }]));
       return Response.json({ ok: true, center: id });
+    }
+    if (body.action === 'renameSite' || body.action === 'deleteSite') {
+      const c = String(body.center || '');
+      if (!CENTERS.includes(c)) return deny(400, 'unknown site');
+      if (body.action === 'renameSite') {
+        const name = String(body.name || '').trim().slice(0, 40);
+        await store().setJSON(p + 'auth-sites', sites.map((s) => (s.id === c ? { ...s, name } : s)));
+        return Response.json({ ok: true, center: c, name });
+      }
+      const s = store(); const { blobs } = await s.list({ prefix: p + 'bed-' });
+      let active = 0;
+      for (const b of blobs) { const d = await s.get(b.key, { type: 'json' }); if (d && d.center === c) active++; }
+      if (active) return deny(409, c + ' still has ' + active + ' active patient' + (active === 1 ? '' : 's') + '. Open them from the patient list and remove them (or change their center) first.');
+      delete codes[c];
+      await s.setJSON(p + 'auth-centers', codes);
+      await s.delete(p + 'list-site-' + c);
+      await s.setJSON(p + 'auth-sites', sites.filter((x) => x.id !== c));
+      return Response.json({ ok: true, center: c, deleted: true });
     }
     const c = String(body.center || '');
     if (!CENTERS.includes(c)) return deny(400, 'unknown center');

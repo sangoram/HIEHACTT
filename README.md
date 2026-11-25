@@ -58,7 +58,7 @@ variables, or database setup steps.
 
 ## Sign-in (Nov 2026)
 
-- **Center team codes** — the app opens on a sign-in screen. Each center (SLN, OAK, ROS, SF, SCL, WCR, LVL2, STAN · Stanford, plus any the admin adds) has
+- **Center team codes** — the app opens on a sign-in screen. Each center (SLN, OAK, ROS, SF, SCL, WCR, LVL2, STAN · Stanford, plus any the admin adds; the admin can also rename or delete sites) has
   one code shared by its whole team; a team sees only its own center's patients and can only save patients under
   its own center. Sign-in lasts 14 days on a device; *Sign out* clears that device's copy of the data.
 - **Admin** — signs in with the admin key, sees and edits every center's patients, and uses `/admin.html` to set,

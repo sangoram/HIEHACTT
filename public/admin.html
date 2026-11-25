@@ -56,7 +56,7 @@
       <div class="msg" id="codeMsg"></div>
       <div style="margin-top:14px;padding-top:12px;border-top:1px solid #f1ead5">
         <b style="font-size:13.5px">Add a site</b>
-        <div class="sub">A new site appears on the sign-in screen but stays off until you set its team code — do that once you’ve briefed the team. It starts from the current master list.</div>
+        <div class="sub">A new site appears on the sign-in screen but stays off until you set its team code — do that once you’ve briefed the team. It starts from the current master list. Use Rename or Delete beside a site to change its full name or remove it; a site with active patients can’t be deleted until they are removed.</div>
         <div class="bar" style="margin-top:8px">
           <input id="newId" placeholder="Code, e.g. STAN" maxlength="8" style="width:150px;text-transform:uppercase">
           <input id="newName" placeholder="Full name, e.g. Stanford" maxlength="40" style="flex:1 1 220px">
@@ -159,7 +159,14 @@
         drawSitePick(status.centers || []);
         var tb = $('centers'); tb.textContent = '';
         (status.centers || []).forEach(function (c) {
-          var tr = el('tr'); var nm = el('td', 'c', c.center); if (c.name) { nm.appendChild(el('div', 'muted', c.name)); } tr.appendChild(nm); tr.appendChild(codeCell(c, 'team')); tr.appendChild(codeCell(c, 'lead'));
+          var tr = el('tr'); var nm = el('td', 'c', c.center); var fn = el('div', 'muted', c.name || 'No full name'); fn.style.cssText = 'font-weight:600;letter-spacing:0'; nm.appendChild(fn);
+          var sb = el('div', 'bar'); sb.style.marginTop = '6px';
+          var rn = el('button', 'sm ghost', 'Rename'); rn.onclick = function () { var v = prompt('Full name for ' + c.center + ' (the code ' + c.center + ' stays the same):', c.name || ''); if (v !== null) action({ action: 'renameSite', center: c.center, name: v.trim() }, c.center + ' renamed.'); };
+          var dl = el('button', 'sm warn', 'Delete'); dl.onclick = function () {
+            var v = prompt('Delete ' + c.center + (c.name ? ' (' + c.name + ')' : '') + '? Its codes and site list are removed and everyone there is signed out. Records of patients it already removed stay in your data export.\n\nType ' + c.center + ' to confirm:');
+            if (v !== null && v.trim().toUpperCase() === c.center) action({ action: 'deleteSite', center: c.center }, c.center + ' deleted.'); else if (v !== null) show($('codeMsg'), 'Not deleted — the code you typed did not match.', false);
+          };
+          sb.appendChild(rn); sb.appendChild(dl); nm.appendChild(sb); tr.appendChild(nm); tr.appendChild(codeCell(c, 'team')); tr.appendChild(codeCell(c, 'lead'));
           tr.appendChild(el('td', null, String(counts[c.center] || 0)));
           var l = el('td'); var a = el('a', 'btn ghost', 'View / edit'); a.href = '/site.html?center=' + c.center; l.appendChild(a); tr.appendChild(l);
           tb.appendChild(tr);
