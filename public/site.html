@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>HIE-NeuroSafe — site list</title>
+<link rel="stylesheet" href="/lists.css">
+</head>
+<body>
+<main>
+  <h1 id="h">Site list</h1>
+  <div class="sub">The checklist every new baby at this site starts with. It is the master list plus the updates this site accepted and the site’s own changes. Changes here apply from the next admission — babies already in the tool keep the list they started with.</div>
+  <div class="bar" style="margin-top:12px">
+    <a class="btn" href="/">← Back to HIE-NeuroSafe</a>
+    <span id="adminPick" style="display:none"><select id="center"></select></span>
+    <a class="btn ghost" id="adminLink" href="/admin.html" style="display:none">Admin console</a>
+    <span class="grow"></span><span class="muted" id="who"></span>
+  </div>
+  <div class="msg" id="msg"></div>
+
+  <section class="card" id="updCard">
+    <h2>Updates from the admin</h2>
+    <div class="sub" id="updSub"></div>
+    <div id="updPending"></div>
+    <details style="margin-top:12px"><summary class="muted" style="cursor:pointer">Earlier updates</summary><div id="updDone"></div></details>
+  </section>
+
+  <section class="card">
+    <h2>This site’s checklist</h2>
+    <div class="sub" id="listSub"></div>
+    <div id="list"></div>
+  </section>
+
+  <section class="card">
+    <h2>This site’s own changes</h2>
+    <div class="sub">Changes made here, on top of the master list. Undo removes one; the rest stay.</div>
+    <div id="own"></div>
+  </section>
+</main>
+<footer>Copyright © 2026 Ashvin Sangoram. All rights reserved.</footer>
+<script src="/list-editor.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var auth = null; try { auth = JSON.parse(localStorage.getItem('hactt_auth_v1')); } catch (e) {}
+  if (!auth || !(auth.exp > Date.now())) { document.querySelector('main').innerHTML = '<h1>Site list</h1><div class="card">Sign in to HIE-NeuroSafe first, then come back. <a class="btn" href="/">Sign in</a></div>'; return; }
+  var admin = auth.role === 'admin';
+  var center = admin ? (new URLSearchParams(location.search).get('center') || 'SLN') : auth.center;
+  function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+  function show(t, ok) { var m = $('msg'); m.textContent = t || ''; m.className = 'msg ' + (ok ? 'ok' : 'err'); m.style.display = t ? 'block' : 'none'; }
+  function api(body) {
+    var o = { cache: 'no-store', headers: { Authorization: 'Bearer ' + auth.token } };
+    if (body) { o.method = 'POST'; o.headers['Content-Type'] = 'application/json'; o.body = JSON.stringify(body); }
+    return fetch('/api/lists' + (body ? '' : '?center=' + encodeURIComponent(center)), o).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw new Error(j.error || 'That did not work (' + r.status + ').'); return j; });
+    });
+  }
+  if (admin) {
+    $('adminPick').style.display = 'inline'; $('adminLink').style.display = 'inline-block';
+    fetch('/api/auth', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (s) { (s.centers || []).forEach(function (c) { var o = el('option', null, c.center + (c.name ? ' · ' + c.name : '')); o.value = c.center; if (c.center === center) o.selected = true; $('center').appendChild(o); }); });
+    $('center').onchange = function () { center = this.value; history.replaceState(null, '', '?center=' + center); load(); };
+  }
+  $('who').textContent = admin ? 'Signed in as admin' : (auth.lead ? center + ' site lead' : center + ' team (view only)');
+
+  var view = null;
+  function draw(v) {
+    view = v; var can = !!v.canEdit;
+    $('h').textContent = v.center + ' site list';
+    $('listSub').textContent = can ? 'Open a card to change it. Edits are saved for this site straight away.' : 'Only the site lead (or the admin) can change this list. Ask your site lead, or edit a baby’s own copy in the tool.';
+    // updates
+    var pend = v.updates.filter(function (u) { return u.changes.some(function (c) { return c.status === 'pending'; }); });
+    var done = v.updates.filter(function (u) { return pend.indexOf(u) < 0; });
+    $('updSub').textContent = v.pending ? v.pending + ' change' + (v.pending === 1 ? '' : 's') + ' waiting for ' + (can ? 'your' : 'the site lead’s') + ' review. Accepted changes are added to this site’s list; rejected ones are left out.' : 'Nothing waiting for review.';
+    function drawUpd(root, list) {
+      root.textContent = '';
+      list.forEach(function (u) {
+        var box = el('div', 'upd' + (u.required ? ' req' : ''));
+        var head = el('div', 'bar'); head.appendChild(el('b', null, 'Update ' + u.seq + (u.note ? ' — ' + u.note : '')));
+        head.appendChild(el('span', 'muted', new Date(u.at).toLocaleDateString()));
+        if (u.required) head.appendChild(el('span', 'st required', 'Required — already applied'));
+        var hasPend = u.changes.some(function (c) { return c.status === 'pending'; });
+        if (can && hasPend) {
+          head.appendChild(el('span', 'grow'));
+          var aa = el('button', 'sm', 'Accept all'); aa.onclick = function () { decide(u.id, 'all', 'a'); }; head.appendChild(aa);
+          var ra = el('button', 'sm ghost', 'Reject all'); ra.onclick = function () { decide(u.id, 'all', 'r'); }; head.appendChild(ra);
+        }
+        box.appendChild(head);
+        u.changes.forEach(function (c) {
+          var row = el('div', 'chg'); row.appendChild(el('span', 't', c.text));
+          row.appendChild(el('span', 'st ' + c.status, { pending: 'Waiting', accepted: 'Accepted', rejected: 'Rejected', required: 'Required', included: 'Included' }[c.status]));
+          if (can && !u.required && c.status !== 'included') {
+            if (c.status !== 'accepted') { var a = el('button', 'sm', 'Accept'); a.onclick = function () { decide(u.id, c.i, 'a'); }; row.appendChild(a); }
+            if (c.status !== 'rejected') { var r = el('button', 'sm ghost', 'Reject'); r.onclick = function () { decide(u.id, c.i, 'r'); }; row.appendChild(r); }
+          }
+          box.appendChild(row);
+        });
+        root.appendChild(box);
+      });
+      if (!list.length) root.appendChild(el('div', 'muted', 'None.'));
+    }
+    drawUpd($('updPending'), pend); drawUpd($('updDone'), done);
+    ListEditor.render($('list'), v.sections, { editable: can, onOps: function (ops) { return post({ action: 'siteOps', center: center, ops: ops }, 'Saved to the ' + center + ' list.'); } });
+    var own = $('own'); own.textContent = '';
+    v.own.forEach(function (o) {
+      var row = el('div', 'chg'); row.appendChild(el('span', 't', o.text + (o.ok ? '' : ' (no longer applies)')));
+      if (o.at) row.appendChild(el('span', 'muted', new Date(o.at).toLocaleDateString()));
+      if (can) { var u = el('button', 'sm ghost', 'Undo'); u.onclick = function () { post({ action: 'siteUndo', center: center, index: o.i }, 'Change undone.'); }; row.appendChild(u); }
+      own.appendChild(row);
+    });
+    if (!v.own.length) own.appendChild(el('div', 'muted', 'No site changes yet — this site uses the master list as is.'));
+  }
+  function post(body, ok) { show(''); return api(body).then(function (v) { draw(v); show(ok, true); }).catch(function (e) { show(e.message, false); }); }
+  function decide(id, i, d) { post({ action: 'decide', center: center, updateId: id, i: i, decision: d }, d === 'a' ? 'Accepted — added to this site’s list.' : 'Rejected — left off this site’s list.'); }
+  function load() { show(''); api().then(draw).catch(function (e) { show(e.message, false); }); }
+  load();
+})();
+</script>
+</body>
+</html>

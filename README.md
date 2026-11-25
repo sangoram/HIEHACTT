@@ -1,4 +1,4 @@
-# HACTT — HIE Acute Care Task Tool
+# HIE-NeuroSafe (formerly HACTT, HIE Acute Care Task Tool)
 
 A shared, live-syncing checklist for therapeutic hypothermia in neonatal HIE. The app holds any number of
 active babies, each identified only by center of birth and date/time of birth. Any device that opens the site sees the same record; birth time, timers,
@@ -39,6 +39,58 @@ Netlify Blobs is enabled automatically on deployed sites. There are no API keys,
 variables, or database setup steps.
 
 ---
+
+## Checklists: master, site and baby (Nov 2026)
+
+- **Master list (admin)** — `/admin.html` → *Master list & updates*. Edit the checklist, then *Publish update* with a
+  short note, sent to all sites (it then becomes part of the master list) or to chosen sites. Tick **Required** for
+  safety corrections: they apply at once and cannot be rejected. The board shows each site's response.
+- **Site list (site lead)** — `/site.html`. Each center has a **site-lead code** (set in the admin console; it signs in
+  like the team code). The lead reviews admin updates change by change (Accept / Reject), edits the site's own list,
+  and can undo any site change. Team members can view the site list but not change it. A lead (or the admin) can
+  also use *Save to <site> site list* on a baby's edited card to make those edits the site standard.
+- **Baby's list** — each new admission takes a snapshot of its site's list; per-baby edits work as before. Babies
+  already in the tool keep the list they started with, so items never shift mid-case.
+- A site switched on for the first time starts from the current master list. All list changes go to the change log.
+- **App updates** — changes to the app itself (qualification logic, views, features) reach every site once merged.
+  Open screens notice a new version within a minute, show a 30-second notice, and reload (waiting if someone is
+  typing); patient data is on the server, so nothing is lost.
+
+## Sign-in (Nov 2026)
+
+- **Center team codes** — the app opens on a sign-in screen. Each center (SLN, OAK, ROS, SF, SCL, WCR, LVL2, STAN · Stanford, plus any the admin adds) has
+  one code shared by its whole team; a team sees only its own center's patients and can only save patients under
+  its own center. Sign-in lasts 14 days on a device; *Sign out* clears that device's copy of the data.
+- **Admin** — signs in with the admin key, sees and edits every center's patients, and uses `/admin.html` to set,
+  change or turn off each center's code (changing a code signs that center out) and to download all data:
+  every record as JSON, a one-row-per-patient CSV, and the list-change log. Patients a team removes are kept for
+  the admin export (`gone-bed-<id>`). The list-change log (`/list-changes.html`) is admin only.
+- **Setup (required before anyone can sign in):** Netlify → Site configuration → Environment variables → add
+  `HACTT_ADMIN_KEY` (8+ characters, keep it private; it applies to production and previews), then redeploy.
+  Sign in at `/admin.html` with it and set a code for each center.
+- **How it's protected:** codes are stored only as salted PBKDF2 hashes; the server checks every request, so one
+  center cannot read or overwrite another's records. After 8 wrong codes in 15 minutes, a network address may try
+  only once every 30 seconds. Signed tokens last 14 days (team) or 12 hours (admin). Changing `HACTT_ADMIN_KEY`
+  signs everyone out.
+- **Still a prototype:** a shared team code is not individual accounts, there is no per-person audit trail, and
+  center + birth time count as identifiers. Review with your privacy office before real clinical use.
+- Handoff summary is now set in Arial. Every page carries "Copyright © 2026 Ashvin Sangoram. All rights reserved."
+
+## What's new in demo-v3 (Nov 2026)
+
+- **Layout** — the first-hours timeline now sits at the bottom of the header (Hide / Show folds it away). Blood-gas
+  entry and modified Sarnat scoring are two cards side by side directly under the header, followed by the cooling
+  decision, Do next, and the checklist cards. Card 2 · Step 3 shows the latest Sarnat result and links up to the card.
+- **Lists are editable per baby** — every card has an *Add a to-do* box and an *Edit list* button: reword an item,
+  flag it time-critical, remove it (standard items can be restored; added ones are deleted), or restore the standard
+  list. *Add a card* at the bottom creates a new card for this baby. Edits are stored on that baby's record
+  (`custom`), sync to every device viewing the baby, appear in the handoff summary, and never touch the standard
+  list — the next admission starts clean. Edited cards and items are labelled.
+- **List-change log** — each edit is posted to `/api/edits` (queued on the device while offline). View it at
+  `/list-changes.html`: counts, the most frequent changes, the full log, and a CSV download
+  (`/api/edits?format=csv`). Entries hold center, age in hours, a short record tag and the item text — no names,
+  MRNs or birth times. Reading the log needs the admin sign-in.
+- The header is sticky only on wide, tall windows (over 760 px wide and 900 px tall); otherwise it scrolls with the page.
 
 ## What's new in demo-v2 (Oct 2026)
 
@@ -82,8 +134,8 @@ variables, or database setup steps.
 
 | | |
 |---|---|
-| Storage | Netlify Blobs, one JSON blob for the active baby |
-| Refresh | every device polls `GET /api/bed/1` every 5 seconds |
+| Storage | Netlify Blobs, one JSON blob per active patient (plus kept copies of removed ones, admin only) |
+| Refresh | every signed-in device polls `GET /api/bed/<id>` every 5 seconds |
 | Writes | `POST /api/bed/1` immediately on every edit |
 | Conflicts | last write wins |
 | Clock | timers anchor to server time, so a device with a wrong clock still shows the right elapsed time |
@@ -105,11 +157,13 @@ reconnects. A reset on one device clears the record everywhere.
 
 ## Editing the app
 
-`public/index.html` is a compiled single file generated from `HIE Acute Checklist.dc.html`.
-Regenerate and replace it rather than hand-editing.
+`public/index.html` is a compiled single-file bundle. The app's markup and logic live as a JSON string inside
+`<script type="__bundler/template">`: unpack it, edit, and re-encode (`json.dumps(..., ensure_ascii=False)` with
+`</` written as `<\u002F`) rather than hand-editing the file.
 
 ## A note on scope
 
-The site is public to anyone with the URL and stores no identifiers, which is what keeps it
-outside PHI territory. Adding names, MRNs, or an audit trail would need authentication and a
-BAA-covered backend. Talk to your institution's privacy office first.
+The site needs a center team code or the admin key, and stores no names or MRNs. It is still not a
+PHI-grade system: shared team codes, no per-person audit trail, and center + birth time are identifiers under
+HIPAA Safe Harbor. Adding names or MRNs would need individual accounts and a BAA-covered backend. Talk to your
+institution's privacy office first.

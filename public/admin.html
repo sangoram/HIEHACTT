@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>HIE-NeuroSafe — admin console</title>
+<link rel="stylesheet" href="/lists.css">
+<style>
+  .c{font-weight:800;letter-spacing:.05em;color:#3f6b52}
+  .pill{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px;white-space:nowrap;align-self:flex-start}
+  .on{color:#3f6b52;background:#e7efe9}.off{color:#8a7f70;background:#efe8dc}
+  .codecell{display:flex;flex-direction:column;gap:5px;min-width:200px}
+  .codecell .bar input{flex:1 1 120px}
+  .tabs{display:flex;gap:6px;margin-top:16px;flex-wrap:wrap}
+  .tabs button{background:#fdfbf7;color:#4a443d;border-color:#d8cdbb}
+  .tabs button.act{background:#2c2825;color:#fff;border-color:#2c2825}
+  .sites label{display:inline-flex;align-items:center;gap:4px;font-size:13px;margin-right:10px}
+</style>
+</head>
+<body>
+<main>
+  <h1>HIE-NeuroSafe — admin console</h1>
+  <div class="sub">Set each center’s codes, manage the master checklist and send updates to sites, and download all data.</div>
+
+  <section class="card" id="login" style="display:none">
+    <h2>Admin sign-in</h2>
+    <div class="sub">Use the admin key saved in Netlify as <b>HACTT_ADMIN_KEY</b>.</div>
+    <div class="bar" style="margin-top:10px">
+      <input id="key" type="password" autocomplete="current-password" placeholder="Admin key" style="flex:1 1 240px">
+      <button id="signin">Sign in</button>
+    </div>
+    <div class="msg" id="loginMsg"></div>
+  </section>
+
+  <div id="app" style="display:none">
+    <div class="bar" style="margin-top:14px">
+      <a class="btn" href="/">← Open HIE-NeuroSafe (all centers)</a>
+      <a class="btn ghost" href="/list-changes.html">List-change log</a>
+      <span class="grow"></span>
+      <button class="ghost" id="signout">Sign out</button>
+    </div>
+    <div class="tabs">
+      <button data-tab="codes" class="act">Center codes</button>
+      <button data-tab="master">Master list &amp; updates</button>
+      <button data-tab="data">All data</button>
+    </div>
+
+    <section class="card tab" id="tab-codes">
+      <h2>Center codes</h2>
+      <div class="sub">Each center’s team shares one <b>team code</b>: everyone there sees the same patients and nobody sees another center’s. The <b>site-lead code</b> signs in the same way and can also change the site’s checklist and accept or reject your updates. Setting a new code signs out everyone using the old one.</div>
+      <table>
+        <thead><tr><th>Center</th><th>Team code (6+ characters)</th><th>Site-lead code (8+ characters)</th><th>Patients</th><th>Site list</th></tr></thead>
+        <tbody id="centers"></tbody>
+      </table>
+      <div class="msg" id="codeMsg"></div>
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid #f1ead5">
+        <b style="font-size:13.5px">Add a site</b>
+        <div class="sub">A new site appears on the sign-in screen but stays off until you set its team code — do that once you’ve briefed the team. It starts from the current master list.</div>
+        <div class="bar" style="margin-top:8px">
+          <input id="newId" placeholder="Code, e.g. STAN" maxlength="8" style="width:150px;text-transform:uppercase">
+          <input id="newName" placeholder="Full name, e.g. Stanford" maxlength="40" style="flex:1 1 220px">
+          <button id="addSite">Add site</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-master" style="display:none">
+      <div class="card">
+        <h2>Master checklist</h2>
+        <div class="sub">The list sent to all sites, and the list a newly switched-on site starts with. Edit it below; nothing reaches any site until you publish the changes as an update.</div>
+        <div id="master"></div>
+      </div>
+      <div class="card">
+        <h2>Unpublished changes</h2>
+        <div id="draft"></div>
+        <div id="pubForm" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid #f1ead5">
+          <div class="bar"><input id="note" placeholder="Short note for sites — what changed and why" maxlength="200" style="flex:1 1 320px"></div>
+          <div class="bar" style="margin-top:9px"><b style="font-size:13px">Send to:</b>
+            <label class="chk"><input type="radio" name="tg" value="all" checked> All sites (becomes part of the master list)</label>
+            <label class="chk"><input type="radio" name="tg" value="some"> Chosen sites only</label>
+          </div>
+          <div class="sites" id="sitePick" style="display:none;margin-top:6px"></div>
+          <div class="bar" style="margin-top:9px">
+            <label class="chk" style="white-space:normal"><input type="checkbox" id="required"> <b>Required</b> — applies straight away; sites see it but cannot reject it. Use for safety corrections.</label>
+          </div>
+          <div class="bar" style="margin-top:10px"><button id="publish">Publish update</button><button class="ghost" id="discard">Discard all</button></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Published updates and each site’s response</h2>
+        <div id="board"></div>
+      </div>
+    </section>
+
+    <section class="card tab" id="tab-data" style="display:none">
+      <h2>All data</h2>
+      <div class="sub">Every patient record entered at any center — active ones, and ones a team has removed from its list (kept for you here). The JSON file holds every field; the CSV has one summary row per patient.</div>
+      <div class="bar" style="margin-top:10px">
+        <button id="dlJson">Download all records (JSON)</button>
+        <button class="ghost" id="dlCsv">Download summary (CSV)</button>
+        <button class="ghost" id="dlEdits">Download list-change log (CSV)</button>
+      </div>
+      <div class="muted" id="totals" style="margin-top:8px"></div>
+      <div class="msg" id="dataMsg"></div>
+    </section>
+    <div class="msg" id="topMsg" style="position:sticky;bottom:12px"></div>
+  </div>
+</main>
+<footer>Copyright © 2026 Ashvin Sangoram. All rights reserved.</footer>
+<script src="/list-editor.js"></script>
+<script>
+(function () {
+  var KEY = 'hactt_auth_v1';
+  var $ = function (id) { return document.getElementById(id); };
+  function auth() { try { var a = JSON.parse(localStorage.getItem(KEY)); if (a && a.role === 'admin' && a.exp > Date.now()) return a; } catch (e) {} return null; }
+  function show(el, text, ok) { el.textContent = text; el.className = 'msg ' + (ok ? 'ok' : 'err'); el.style.display = text ? 'block' : 'none'; }
+  function api(url, opts) {
+    opts = opts || {}; var a = auth(); opts.headers = Object.assign({}, opts.headers || {}, a ? { Authorization: 'Bearer ' + a.token } : {}); opts.cache = 'no-store';
+    return fetch(url, opts).then(function (r) { if (r.status === 401) { localStorage.removeItem(KEY); render(); throw new Error('Signed out — please sign in again.'); } return r; });
+  }
+  function post(url, body) {
+    return api(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw new Error(j.error || 'That did not work.'); return j; }); });
+  }
+  function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+
+  document.querySelectorAll('.tabs button').forEach(function (b) {
+    b.onclick = function () {
+      document.querySelectorAll('.tabs button').forEach(function (x) { x.classList.toggle('act', x === b); });
+      document.querySelectorAll('.tab').forEach(function (t) { t.style.display = t.id === 'tab-' + b.dataset.tab ? '' : 'none'; });
+      if (b.dataset.tab === 'master') loadMaster();
+    };
+  });
+
+  function render() {
+    var a = auth(); $('login').style.display = a ? 'none' : 'block'; $('app').style.display = a ? 'block' : 'none';
+    if (a) { loadCodes(); loadMaster(); } else $('key').focus();
+  }
+
+  // ---------- center codes ----------
+  function codeCell(c, kind) {
+    var ready = kind === 'team' ? c.ready : c.leadReady, at = kind === 'team' ? c.setAt : c.leadSetAt;
+    var td = el('td'); var w = el('div', 'codecell');
+    w.appendChild(el('span', 'pill ' + (ready ? 'on' : 'off'), ready ? 'On · set ' + new Date(at).toLocaleDateString() : (kind === 'team' ? 'Off — no code yet' : 'None yet')));
+    var bar = el('div', 'bar'); var inp = el('input'); inp.type = 'text'; inp.autocomplete = 'off'; inp.placeholder = ready ? 'New code' : 'Set a code'; bar.appendChild(inp);
+    var set = el('button', 'sm', ready ? 'Change' : 'Set');
+    if (kind === 'lead' && !c.ready) { set.disabled = true; inp.disabled = true; inp.placeholder = 'Set the team code first'; }
+    set.onclick = function () { action({ action: kind === 'team' ? 'setCode' : 'setLead', center: c.center, code: inp.value }, c.center + (kind === 'team' ? ' team' : ' site-lead') + ' code saved — share it with ' + (kind === 'team' ? 'the team.' : 'the site lead only.')); };
+    bar.appendChild(set);
+    if (ready) { var off = el('button', 'sm warn', 'Turn off'); off.onclick = function () { if (confirm(kind === 'team' ? 'Turn off sign-in for ' + c.center + '? Everyone there (lead included) is signed out until you set a new code.' : 'Turn off the ' + c.center + ' site-lead code?')) action({ action: kind === 'team' ? 'disable' : 'disableLead', center: c.center }, 'Turned off.'); }; bar.appendChild(off); }
+    w.appendChild(bar); td.appendChild(w); return td;
+  }
+  function loadCodes() {
+    Promise.all([fetch('/api/auth', { cache: 'no-store' }).then(function (r) { return r.json(); }), api('/api/beds').then(function (r) { return r.json(); })])
+      .then(function (res) {
+        var status = res[0], beds = res[1].patients || [], counts = {};
+        beds.forEach(function (p) { counts[p.center || '—'] = (counts[p.center || '—'] || 0) + 1; });
+        drawSitePick(status.centers || []);
+        var tb = $('centers'); tb.textContent = '';
+        (status.centers || []).forEach(function (c) {
+          var tr = el('tr'); var nm = el('td', 'c', c.center); if (c.name) { nm.appendChild(el('div', 'muted', c.name)); } tr.appendChild(nm); tr.appendChild(codeCell(c, 'team')); tr.appendChild(codeCell(c, 'lead'));
+          tr.appendChild(el('td', null, String(counts[c.center] || 0)));
+          var l = el('td'); var a = el('a', 'btn ghost', 'View / edit'); a.href = '/site.html?center=' + c.center; l.appendChild(a); tr.appendChild(l);
+          tb.appendChild(tr);
+        });
+        $('totals').textContent = beds.length + ' active patient' + (beds.length === 1 ? '' : 's') + ' across all centers' + (counts['—'] ? ' · ' + counts['—'] + ' with no center set' : '') + '.';
+      }).catch(function (e) { show($('codeMsg'), e.message || 'Could not load.', false); });
+  }
+  function action(body, okText) {
+    show($('codeMsg'), '', true);
+    post('/api/auth', body).then(function () { show($('codeMsg'), okText, true); loadCodes(); }).catch(function (e) { show($('codeMsg'), e.message, false); });
+  }
+
+  // ---------- master list & updates ----------
+  function drawSitePick(centers) {
+    var box = $('sitePick'), keep = {}; box.querySelectorAll('input:checked').forEach(function (i) { keep[i.value] = 1; }); box.textContent = '';
+    centers.forEach(function (c) { var l = el('label'); var i = el('input'); i.type = 'checkbox'; i.value = c.center; i.checked = !!keep[c.center]; l.appendChild(i); l.appendChild(document.createTextNode(c.center + (c.name ? ' · ' + c.name : ''))); box.appendChild(l); });
+  }
+  document.querySelectorAll('input[name=tg]').forEach(function (r) { r.onchange = function () { $('sitePick').style.display = document.querySelector('input[name=tg]:checked').value === 'some' ? 'block' : 'none'; }; });
+  function drawMaster(j) {
+    ListEditor.render($('master'), j.master.preview, { editable: true, newTag: 'Unpublished', onOps: function (ops) { return mpost({ action: 'draftOps', ops: ops }, 'Added to your unpublished changes.'); } });
+    var d = $('draft'); d.textContent = '';
+    j.master.draft.forEach(function (c) { var row = el('div', 'chg'); row.appendChild(el('span', 't', c.text)); var u = el('button', 'sm ghost', 'Undo'); u.onclick = function () { mpost({ action: 'draftUndo', index: c.i }, 'Undone.'); }; row.appendChild(u); d.appendChild(row); });
+    if (!j.master.draft.length) d.appendChild(el('div', 'muted', 'None — edit the master checklist above to start an update.'));
+    $('pubForm').style.display = j.master.draft.length ? 'block' : 'none';
+    var b = $('board'); b.textContent = '';
+    j.updates.forEach(function (u) {
+      var box = el('div', 'upd' + (u.required ? ' req' : ''));
+      var head = el('div', 'bar'); head.appendChild(el('b', null, 'Update ' + u.seq + (u.note ? ' — ' + u.note : '')));
+      head.appendChild(el('span', 'muted', new Date(u.at).toLocaleString() + ' · ' + u.count + ' change' + (u.count === 1 ? '' : 's') + ' · to ' + (u.targets === 'all' ? 'all sites' : u.targets.join(', '))));
+      if (u.required) head.appendChild(el('span', 'st required', 'Required'));
+      box.appendChild(head);
+      var row = el('div', 'bar'); row.style.marginTop = '8px';
+      u.sites.forEach(function (s) {
+        var lab = { off: 'not on yet — will start from the master list', required: 'applied', included: 'included at start', pending: s.accepted + s.rejected ? (s.accepted + s.rejected) + '/' + s.total + ' reviewed' : 'waiting', accepted: 'accepted', rejected: 'rejected', mixed: s.accepted + ' accepted · ' + s.rejected + ' rejected' }[s.state];
+        row.appendChild(el('span', 'st ' + s.state, s.center + ' · ' + lab));
+      });
+      box.appendChild(row); b.appendChild(box);
+    });
+    if (!j.updates.length) b.appendChild(el('div', 'muted', 'No updates published yet.'));
+  }
+  function loadMaster() { api('/api/lists').then(function (r) { return r.json(); }).then(drawMaster).catch(function (e) { show($('topMsg'), e.message, false); }); }
+  function mpost(body, ok) { show($('topMsg'), '', true); return post('/api/lists', body).then(function (j) { drawMaster(j); show($('topMsg'), ok, true); setTimeout(function () { show($('topMsg'), '', true); }, 2500); }).catch(function (e) { show($('topMsg'), e.message, false); }); }
+  $('publish').onclick = function () {
+    var tg = document.querySelector('input[name=tg]:checked').value === 'all' ? 'all' : [].slice.call(document.querySelectorAll('#sitePick input:checked')).map(function (i) { return i.value; });
+    var req = $('required').checked;
+    if (!confirm('Publish this update to ' + (tg === 'all' ? 'all sites' : tg.join(', ')) + (req ? ' as REQUIRED (applies immediately)' : ' for each site to accept or reject') + '?')) return;
+    mpost({ action: 'publish', note: $('note').value, required: req, targets: tg }, 'Published.').then(function () { $('note').value = ''; $('required').checked = false; });
+  };
+  $('discard').onclick = function () { if (confirm('Discard all unpublished changes?')) mpost({ action: 'draftClear' }, 'Discarded.'); };
+
+  $('addSite').onclick = function () {
+    var id = $('newId').value.trim().toUpperCase(), name = $('newName').value.trim();
+    post('/api/auth', { action: 'addSite', id: id, name: name }).then(function () { $('newId').value = ''; $('newName').value = ''; show($('codeMsg'), id + ' added. Set its team code when the site is ready to start.', true); loadCodes(); })
+      .catch(function (e) { show($('codeMsg'), e.message, false); });
+  };
+
+  // ---------- data ----------
+  function download(url, name) {
+    show($('dataMsg'), '', true);
+    api(url).then(function (r) { if (!r.ok) throw new Error('Download failed (' + r.status + ').'); return r.blob(); })
+      .then(function (b) { var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000); })
+      .catch(function (e) { show($('dataMsg'), e.message, false); });
+  }
+  var day = function () { return new Date().toISOString().slice(0, 10); };
+  $('dlJson').onclick = function () { download('/api/export', 'hie-neurosafe-all-records-' + day() + '.json'); };
+  $('dlCsv').onclick = function () { download('/api/export?format=csv', 'hie-neurosafe-patients-' + day() + '.csv'); };
+  $('dlEdits').onclick = function () { download('/api/edits?format=csv', 'hie-neurosafe-list-changes-' + day() + '.csv'); };
+
+  function signIn() {
+    var code = $('key').value.trim(); if (!code) return;
+    fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ admin: true, code: code }) })
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || 'Sign-in failed.'); return j; }); })
+      .then(function (j) { localStorage.setItem(KEY, JSON.stringify({ token: j.token, role: j.role, center: '', exp: j.exp })); $('key').value = ''; show($('loginMsg'), '', true); render(); })
+      .catch(function (e) { show($('loginMsg'), e.message, false); });
+  }
+  $('signin').onclick = signIn;
+  $('key').onkeydown = function (e) { if (e.key === 'Enter') signIn(); };
+  $('signout').onclick = function () { localStorage.removeItem(KEY); render(); };
+  fetch('/api/auth', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (s) {
+    if (s.adminConfigured === false) show($('loginMsg'), 'Sign-in is not switched on yet: add an HACTT_ADMIN_KEY environment variable (8+ characters) in Netlify, then redeploy.', false);
+  }).catch(function () {});
+  render();
+})();
+</script>
+</body>
+</html>
