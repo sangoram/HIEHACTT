@@ -48,12 +48,13 @@ export async function centerCodes(context) {
   return (await store().get(prefix(context) + 'auth-centers', { type: 'json' })) || {};
 }
 
-export function issue(role, center, v) {
+export function issue(role, center, v, lv) {
   const exp = Date.now() + (role === 'admin' ? ADMIN_TTL : CENTER_TTL);
-  return { token: makeToken({ r: role, c: center || '', v: v || 0, exp }), role, center: center || '', exp };
+  return { token: makeToken({ r: role, c: center || '', v: v || 0, l: lv || 0, exp }), role, center: center || '', lead: !!lv, exp };
 }
 
-// Returns { role: 'admin' } or { role: 'center', center } — or null when signed out, expired or revoked.
+// Returns { role: 'admin' } or { role: 'center', center, lead } — or null when signed out, expired or revoked.
+// A site lead signs in with the center's lead code: same patients as the team, plus changes to the site list.
 export async function getAuth(req, context) {
   const h = req.headers.get('authorization') || '';
   const p = readToken(h.replace(/^Bearer\s+/i, ''));
@@ -61,8 +62,9 @@ export async function getAuth(req, context) {
   if (p.r === 'admin') return { role: 'admin' };
   if (p.r === 'center' && CENTERS.includes(p.c)) {
     const rec = (await centerCodes(context))[p.c];
+    if (p.l) { if (!rec || !rec.lead || rec.lead.v !== p.l) return null; return { role: 'center', center: p.c, lead: true }; }
     if (!rec || rec.v !== p.v) return null; // code changed or disabled since this token was issued
-    return { role: 'center', center: p.c };
+    return { role: 'center', center: p.c, lead: false };
   }
   return null;
 }

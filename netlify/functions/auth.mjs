@@ -1,11 +1,15 @@
 import crypto from 'node:crypto';
 import { CENTERS, store, prefix, adminKey, hashCode, issue, getAuth, centerCodes, deny, sameCode } from '../lib/auth.mjs';
+import { loadMaster, loadSite, saveSite, lastSeq } from '../lib/lists.mjs';
 
 // GET  /api/auth                       → which centers have a team code, whether the admin key is configured
 // POST /api/auth { center, code }      → sign in as that center's team
 // POST /api/auth { admin: true, code } → sign in as admin
 // POST /api/auth { action: 'setCode', center, code }   (admin) → set or change a center's team code
-// POST /api/auth { action: 'disable', center }         (admin) → turn a center's sign-in off
+// POST /api/auth { action: 'setLead', center, code }   (admin) → set or change a center's site-lead code
+// POST /api/auth { action: 'disable', center }         (admin) → turn a center's sign-in off (team and lead)
+// POST /api/auth { action: 'disableLead', center }     (admin) → turn off only the site-lead code
+// The same sign-in box takes either code: the lead code signs in as site lead.
 // After 8 wrong codes from one network address within 15 minutes, that address may try only once every
 // 30 seconds. Nobody is locked out, and devices already signed in are never affected.
 
@@ -29,7 +33,7 @@ export default async (req, context) => {
   if (req.method !== 'POST') {
     return Response.json({
       adminConfigured: adminKey().length >= 8,
-      centers: CENTERS.map((c) => ({ center: c, ready: !!codes[c], setAt: codes[c] ? codes[c].setAt : null })),
+      centers: CENTERS.map((c) => ({ center: c, ready: !!codes[c], setAt: codes[c] ? codes[c].setAt : null, leadReady: !!(codes[c] && codes[c].lead), leadSetAt: codes[c] && codes[c].lead ? codes[c].lead.setAt : null })),
     }, { headers: { 'cache-control': 'no-store' } });
   }
 
@@ -43,16 +47,30 @@ export default async (req, context) => {
     if (!who || who.role !== 'admin') return deny(403, 'admin only');
     const c = String(body.center || '');
     if (!CENTERS.includes(c)) return deny(400, 'unknown center');
+    const code = String(body.code || '').trim();
     if (body.action === 'setCode') {
-      const code = String(body.code || '').trim();
       if (code.length < 6) return deny(400, 'Team codes need at least 6 characters.');
+      if (codes[c] && codes[c].lead && sameCode(hashCode(code, codes[c].lead.salt), codes[c].lead.hash)) return deny(400, 'Use a different code from the site-lead code.');
       const salt = crypto.randomBytes(16).toString('hex');
-      codes[c] = { salt, hash: hashCode(code, salt), v: ((codes[c] && codes[c].v) || 0) + 1, setAt: Date.now() };
+      const first = !codes[c];
+      codes[c] = { ...(codes[c] || {}), salt, hash: hashCode(code, salt), v: ((codes[c] && codes[c].v) || 0) + 1, setAt: Date.now() };
+      if (first) { // a site switched on for the first time starts from the current master list
+        const s = await loadSite(context, c);
+        if (!s.ops.length && !Object.keys(s.decisions || {}).length) { s.joinedSeq = lastSeq(await loadMaster(context)); await saveSite(context, c, s); }
+      }
+    } else if (body.action === 'setLead') {
+      if (!codes[c]) return deny(400, 'Set the team code first.');
+      if (code.length < 8) return deny(400, 'Site-lead codes need at least 8 characters.');
+      if (sameCode(hashCode(code, codes[c].salt), codes[c].hash)) return deny(400, 'Use a different code from the team code.');
+      const salt = crypto.randomBytes(16).toString('hex');
+      codes[c].lead = { salt, hash: hashCode(code, salt), v: ((codes[c].lead && codes[c].lead.v) || 0) + 1, setAt: Date.now() };
     } else if (body.action === 'disable') {
       delete codes[c];
+    } else if (body.action === 'disableLead') {
+      if (codes[c]) delete codes[c].lead;
     } else return deny(400, 'unknown action');
     await store().setJSON(p + 'auth-centers', codes);
-    return Response.json({ ok: true, center: c, ready: !!codes[c] });
+    return Response.json({ ok: true, center: c, ready: !!codes[c], leadReady: !!(codes[c] && codes[c].lead) });
   }
 
   // ---- sign in ----
@@ -70,9 +88,10 @@ export default async (req, context) => {
   if (!rec) return deny(403, 'Sign-in for ' + c + ' has not been set up yet — ask the admin for a team code.');
   const key = p + 'auth-fail-' + c + '-' + ip; const g = await failGate(key);
   if (g.locked) return deny(429, 'Too many wrong codes — wait 30 seconds, then try again.');
-  if (!sameCode(hashCode(code, rec.salt), rec.hash)) { await noteFail(g.s, key, g.rec); return deny(401, 'That code is not right for ' + c + '.'); }
+  const isLead = !!(rec.lead && sameCode(hashCode(code, rec.lead.salt), rec.lead.hash));
+  if (!isLead && !sameCode(hashCode(code, rec.salt), rec.hash)) { await noteFail(g.s, key, g.rec); return deny(401, 'That code is not right for ' + c + '.'); }
   if (g.rec.n) await g.s.delete(key);
-  return Response.json(issue('center', c, rec.v));
+  return Response.json(issue('center', c, rec.v, isLead ? rec.lead.v : 0));
 };
 
 export const config = { path: '/api/auth' };

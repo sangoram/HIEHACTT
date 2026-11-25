@@ -40,6 +40,22 @@ variables, or database setup steps.
 
 ---
 
+## Checklists: master, site and baby (Nov 2026)
+
+- **Master list (admin)** — `/admin.html` → *Master list & updates*. Edit the checklist, then *Publish update* with a
+  short note, sent to all sites (it then becomes part of the master list) or to chosen sites. Tick **Required** for
+  safety corrections: they apply at once and cannot be rejected. The board shows each site's response.
+- **Site list (site lead)** — `/site.html`. Each center has a **site-lead code** (set in the admin console; it signs in
+  like the team code). The lead reviews admin updates change by change (Accept / Reject), edits the site's own list,
+  and can undo any site change. Team members can view the site list but not change it. A lead (or the admin) can
+  also use *Save to <site> site list* on a baby's edited card to make those edits the site standard.
+- **Baby's list** — each new admission takes a snapshot of its site's list; per-baby edits work as before. Babies
+  already in the tool keep the list they started with, so items never shift mid-case.
+- A site switched on for the first time starts from the current master list. All list changes go to the change log.
+- **App updates** — changes to the app itself (qualification logic, views, features) reach every site once merged.
+  Open screens notice a new version within a minute, show a 30-second notice, and reload (waiting if someone is
+  typing); patient data is on the server, so nothing is lost.
+
 ## Sign-in (Nov 2026)
 
 - **Center team codes** — the app opens on a sign-in screen. Each center (SLN, OAK, ROS, SF, SCL, WCR, LVL2) has

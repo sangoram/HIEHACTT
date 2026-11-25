@@ -60,7 +60,9 @@
   var LABEL = {
     add_item: ['Added to-do', 'add'], edit_item: ['Reworded', 'edit'], remove_item: ['Removed', 'rem'], restore_item: ['Restored', 'other'],
     restore_wording: ['Restored wording', 'other'], flag_critical: ['Flagged time-critical', 'edit'], unflag_critical: ['Unflagged time-critical', 'edit'],
-    add_card: ['Added card', 'add'], rename_card: ['Renamed card', 'edit'], remove_card: ['Deleted card', 'rem'], restore_card: ['Restored standard card', 'other']
+    add_card: ['Added card', 'add'], rename_card: ['Renamed card', 'edit'], remove_card: ['Deleted card', 'rem'], restore_card: ['Restored standard card', 'other'],
+    save_to_site_list: ['Saved to site list', 'add'], site_change: ['Site list change', 'edit'], site_undo: ['Site change undone', 'other'],
+    master_published: ['Admin update published', 'add'], update_accepted: ['Site accepted', 'add'], update_rejected: ['Site rejected', 'rem']
   };
   var auth = null; try { auth = JSON.parse(localStorage.getItem('hactt_auth_v1')); } catch (e) {}
   var hdr = auth && auth.token ? { Authorization: 'Bearer ' + auth.token } : {};
