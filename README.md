@@ -40,6 +40,26 @@ variables, or database setup steps.
 
 ---
 
+## Sign-in (Nov 2026)
+
+- **Center team codes** — the app opens on a sign-in screen. Each center (SLN, OAK, ROS, SF, SCL, WCR, LVL2) has
+  one code shared by its whole team; a team sees only its own center's patients and can only save patients under
+  its own center. Sign-in lasts 14 days on a device; *Sign out* clears that device's copy of the data.
+- **Admin** — signs in with the admin key, sees and edits every center's patients, and uses `/admin.html` to set,
+  change or turn off each center's code (changing a code signs that center out) and to download all data:
+  every record as JSON, a one-row-per-patient CSV, and the list-change log. Patients a team removes are kept for
+  the admin export (`gone-bed-<id>`). The list-change log (`/list-changes.html`) is admin only.
+- **Setup (required before anyone can sign in):** Netlify → Site configuration → Environment variables → add
+  `HACTT_ADMIN_KEY` (8+ characters, keep it private; it applies to production and previews), then redeploy.
+  Sign in at `/admin.html` with it and set a code for each center.
+- **How it's protected:** codes are stored only as salted PBKDF2 hashes; the server checks every request, so one
+  center cannot read or overwrite another's records. After 8 wrong codes in 15 minutes, a network address may try
+  only once every 30 seconds. Signed tokens last 14 days (team) or 12 hours (admin). Changing `HACTT_ADMIN_KEY`
+  signs everyone out.
+- **Still a prototype:** a shared team code is not individual accounts, there is no per-person audit trail, and
+  center + birth time count as identifiers. Review with your privacy office before real clinical use.
+- Handoff summary is now set in Arial. Every page carries "Copyright © 2025 Ashvin Sangoram. All rights reserved."
+
 ## What's new in demo-v3 (Nov 2026)
 
 - **Layout** — the first-hours timeline now sits at the bottom of the header (Hide / Show folds it away). Blood-gas
@@ -53,8 +73,7 @@ variables, or database setup steps.
 - **List-change log** — each edit is posted to `/api/edits` (queued on the device while offline). View it at
   `/list-changes.html`: counts, the most frequent changes, the full log, and a CSV download
   (`/api/edits?format=csv`). Entries hold center, age in hours, a short record tag and the item text — no names,
-  MRNs or birth times. The log is as public as the site; to require a key for reading it, add a
-  `HACTT_LOG_KEY` environment variable in Netlify and open `/list-changes.html?key=<value>`.
+  MRNs or birth times. Reading the log needs the admin sign-in.
 - The header is sticky only on wide, tall windows (over 760 px wide and 900 px tall); otherwise it scrolls with the page.
 
 ## What's new in demo-v2 (Oct 2026)
@@ -99,8 +118,8 @@ variables, or database setup steps.
 
 | | |
 |---|---|
-| Storage | Netlify Blobs, one JSON blob for the active baby |
-| Refresh | every device polls `GET /api/bed/1` every 5 seconds |
+| Storage | Netlify Blobs, one JSON blob per active patient (plus kept copies of removed ones, admin only) |
+| Refresh | every signed-in device polls `GET /api/bed/<id>` every 5 seconds |
 | Writes | `POST /api/bed/1` immediately on every edit |
 | Conflicts | last write wins |
 | Clock | timers anchor to server time, so a device with a wrong clock still shows the right elapsed time |
@@ -128,6 +147,7 @@ reconnects. A reset on one device clears the record everywhere.
 
 ## A note on scope
 
-The site is public to anyone with the URL and stores no identifiers, which is what keeps it
-outside PHI territory. Adding names, MRNs, or an audit trail would need authentication and a
-BAA-covered backend. Talk to your institution's privacy office first.
+The site needs a center team code or the admin key, and stores no names or MRNs. It is still not a
+PHI-grade system: shared team codes, no per-person audit trail, and center + birth time are identifiers under
+HIPAA Safe Harbor. Adding names or MRNs would need individual accounts and a BAA-covered backend. Talk to your
+institution's privacy office first.

@@ -1,19 +1,21 @@
-import { getStore } from '@netlify/blobs';
+import { store, prefix, getAuth, deny } from '../lib/auth.mjs';
 
-// GET /api/beds — list of active patients (summary fields only), polled by the home screen.
-// Records are keyed by deploy context so previews never read production data.
+// GET /api/beds — active patients (summary fields only), polled by the home screen.
+// A center team sees its own center's patients; the admin sees every center.
 export default async (req, context) => {
-  const store = getStore('hactt');
-  const ctx = (context && context.deploy && context.deploy.context) || 'production';
-  const prefix = (ctx === 'production' ? '' : ctx + '-') + 'bed-';
-  const { blobs } = await store.list({ prefix });
+  const who = await getAuth(req, context);
+  if (!who) return deny();
+  const s = store();
+  const pre = prefix(context) + 'bed-';
+  const { blobs } = await s.list({ prefix: pre });
 
   const patients = (await Promise.all(
     blobs.map(async (b) => {
-      const doc = await store.get(b.key, { type: 'json' });
+      const doc = await s.get(b.key, { type: 'json' });
       if (!doc) return null;
+      if (who.role !== 'admin' && doc.center !== who.center) return null;
       return {
-        id: b.key.slice(prefix.length),
+        id: b.key.slice(pre.length),
         center: doc.center || '',
         birth: doc.birth || null,
         ga: doc.ga || null,
@@ -25,7 +27,7 @@ export default async (req, context) => {
   )).filter(Boolean);
 
   return Response.json(
-    { patients, serverTime: Date.now() },
+    { patients, role: who.role, center: who.center || '', serverTime: Date.now() },
     { headers: { 'cache-control': 'no-store' } }
   );
 };

@@ -1,9 +1,9 @@
-import { getStore } from '@netlify/blobs';
+import { store as getS, prefix as pfx, getAuth, deny } from '../lib/auth.mjs';
 
 // POST /api/edits — { entries: [...] } appends list-change entries from the app.
 //                   Each batch is its own blob, so two devices logging at once never overwrite each other.
-// GET  /api/edits — every entry, newest first. Add ?format=csv to download a spreadsheet.
-//                   If the site has a HACTT_LOG_KEY environment variable, GET needs ?key=<that value>.
+// GET  /api/edits — every entry, newest first (admin only). Add ?format=csv to download a spreadsheet.
+// Posting needs any signed-in team; a center team's entries are always filed under its own center.
 //
 // Entries describe edits people make to a baby's copy of the checklist (add / reword / remove / restore).
 // They carry no names, MRNs or birth times: only center, age in hours, a short record tag and the text of the item.
@@ -43,17 +43,18 @@ function cell(v) {
 }
 
 export default async (req, context) => {
-  const store = getStore('hactt');
+  const who = await getAuth(req, context);
+  if (!who) return deny();
+  const store = getS();
   // Keep deploy previews and branch deploys out of the production log.
-  const ctx = (context && context.deploy && context.deploy.context) || 'production';
-  const prefix = (ctx === 'production' ? '' : ctx + '-') + 'edit-';
+  const prefix = pfx(context) + 'edit-';
 
   if (req.method === 'POST') {
     let body = {};
     try { body = await req.json(); } catch { /* empty body */ }
     const list = Array.isArray(body.entries) ? body.entries.slice(0, 50) : [];
     const at = Date.now();
-    const entries = list.filter((e) => e && typeof e === 'object' && e.action).map((e) => clean(e, at));
+    const entries = list.filter((e) => e && typeof e === 'object' && e.action).map((e) => clean(who.role === 'center' ? { ...e, center: who.center } : e, at));
     if (!entries.length) return new Response('no entries', { status: 400 });
     const key = prefix + at + '-' + Math.random().toString(36).slice(2, 8);
     await store.setJSON(key, { at, entries });
@@ -61,8 +62,7 @@ export default async (req, context) => {
   }
 
   const url = new URL(req.url);
-  const need = (globalThis.Netlify && globalThis.Netlify.env && globalThis.Netlify.env.get('HACTT_LOG_KEY')) || process.env.HACTT_LOG_KEY || '';
-  if (need && url.searchParams.get('key') !== need) return new Response('log key required', { status: 401 });
+  if (who.role !== 'admin') return deny(403, 'admin only');
 
   const { blobs } = await store.list({ prefix });
   const batches = await Promise.all(blobs.map((b) => store.get(b.key, { type: 'json' })));
